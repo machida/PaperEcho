@@ -1,0 +1,50 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Dependencies / build output
+node_modules
+dist
+dist-ssr
+*.local
+
+# Rust / Tauri build output
+src-tauri/target
+
+# Tauri auto-generated
+src-tauri/gen/schemas
+
+# Staged runtime + bundled binaries (build artifacts; ffmpeg is fetched by
+# scripts/fetch-ffmpeg.sh, the runtime is staged by scripts/build-python-dist.sh)
+src-tauri/resources-arm64
+
+# Packaged runtime tarball (uploaded to GitHub Releases, not committed)
+dist-runtime
+
+# Python virtualenv & caches
+python/.venv
+python/.pytest_cache
+__pycache__/
+*.py[cod]
+
+# Model weights bundled at dist time (see CLAUDE.md "Offline models")
+python/model-cache
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Claude Code local settings
+.claude/settings.local.json

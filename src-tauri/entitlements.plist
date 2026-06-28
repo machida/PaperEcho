@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  Hardened-runtime entitlements for a notarised Paper Echo build.
+
+  Notarisation requires the Hardened Runtime. These entitlements apply to the
+  APP process (the Tauri/WebKit shell) only. The Python ML runtime is spawned as
+  a SEPARATE child process and is downloaded after install, so it is NOT covered
+  by the app's signature and is NOT subject to these entitlements — it runs as a
+  normal (ad-hoc-signed, per python-build-standalone) process, which on arm64 is
+  enough to execute, and being a child it can JIT / allocate executable memory
+  (torch) without any entitlement here. `runtime.rs::strip_quarantine` clears the
+  quarantine bit on the extracted runtime so first execution isn't blocked.
+
+  Kept minimal on purpose. allow-jit / allow-unsigned-executable-memory /
+  disable-library-validation would only matter if torch were ever loaded INTO the
+  app process (it isn't); add them here only if that changes.
+-->
+<plist version="1.0">
+<dict>
+  <!-- WebKit (the Tauri webview) needs JIT for JavaScript in the app process. -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+</dict>
+</plist>

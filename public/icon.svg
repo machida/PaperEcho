@@ -1,0 +1,26 @@
+<svg width="1024" height="1024" viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#8b6bff"/>
+      <stop offset="1" stop-color="#5b3fd6"/>
+    </linearGradient>
+  </defs>
+  <!-- squircle-ish background -->
+  <rect x="64" y="64" width="896" height="896" rx="208" fill="url(#bg)"/>
+  <!-- staff lines (the "paper" / sheet music) -->
+  <g stroke="#ffffff" stroke-opacity="0.16" stroke-width="14" stroke-linecap="round">
+    <line x1="196" y1="404" x2="828" y2="404"/>
+    <line x1="196" y1="478" x2="828" y2="478"/>
+    <line x1="196" y1="552" x2="828" y2="552"/>
+    <line x1="196" y1="626" x2="828" y2="626"/>
+    <line x1="196" y1="700" x2="828" y2="700"/>
+  </g>
+  <!-- eighth note (the "echo" of the audio, drawn as notation) -->
+  <g fill="#ffffff">
+    <rect x="560" y="300" width="42" height="402"/>
+    <path d="M602 300
+             C 724 336, 760 470, 668 548
+             C 742 466, 712 380, 602 374 Z"/>
+    <ellipse cx="472" cy="700" rx="124" ry="94" transform="rotate(-22 472 700)"/>
+  </g>
+</svg>
