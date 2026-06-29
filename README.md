@@ -6,6 +6,27 @@ MIDI）の下書きを作成します。仕上げは MuseScore / Dorico / Sibeli
 これは最終的な楽譜ではなく **下書き** を作るツールで、耳コピの時間を約 80% 短縮
 することを目的としています。
 
+## ダウンロード（macOS / Apple Silicon）
+
+最新版は [Releases](https://github.com/machida/PaperEcho/releases/latest) から
+**`PaperEcho-<ver>-arm64.dmg`** をダウンロードできます。Apple Silicon（arm64）
+専用で、Intel Mac には非対応です。
+
+1. DMG を開き、**Paper Echo** を Applications にドラッグします。
+2. 初回起動時、解析エンジン（約 430 MB）を一度だけ自動ダウンロードします。以降は
+   オフラインで動作します。
+
+> **未署名アプリの起動について。** このアプリは Apple の公証（notarization）を
+> 受けていないため、初回起動時に Gatekeeper がブロックします。ターミナルで検疫
+> 属性を外すのが確実です:
+>
+> ```sh
+> xattr -dr com.apple.quarantine "/Applications/Paper Echo.app"
+> ```
+>
+> または、起動して「開けません」と出たら **システム設定 → プライバシーとセキュリティ**
+> の「このまま開く」をクリックしてください。
+
 ## アーキテクチャ
 
 3 層構成です。
@@ -101,8 +122,9 @@ npm run tauri dev
 「初回セットアップ」画面で）GitHub Releases から `<app_data>/runtime-<version>/`
 にダウンロードします。これにより DMG は数十 MB に収まります。ランタイムは AI
 モデルの重みも同梱するため、**初回解析も完全オフライン** で動作します（追加の
-ダウンロードなし）。ビルドは既定で未署名（初回は右クリック →「開く」）；Developer
-ID 署名 + 公証も環境変数で有効化できます。ビルド/リリース手順・スリム化・公証は
+ダウンロードなし）。ビルドは既定で未署名（未署名のため初回は検疫属性の削除か
+「このまま開く」が必要——上記「ダウンロード」参照）；Developer ID 署名 + 公証も
+環境変数で有効化できます。ビルド/リリース手順・スリム化・公証は
 [`DISTRIBUTION.md`](DISTRIBUTION.md) を参照。macOS Apple Silicon（arm64）のみ対応。
 
 ## パイプラインを直接テストする
