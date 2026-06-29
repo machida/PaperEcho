@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 
 import { StemMixer, type LoadResult, type TrackState } from "../lib/audio";
 import { analyze, mixdown, onProgress, pickSaveMp3, reveal } from "../lib/ipc";
+import { useI18n, type TFunc } from "../lib/i18n";
 import {
   PART_META,
   PART_ORDER,
@@ -19,15 +20,10 @@ interface AnalyzeProps {
   onBack: () => void;
 }
 
-const STAGE_LABELS: Record<string, string> = {
-  decode: "Decoding audio",
-  separate: "Separating parts",
-  rhythm: "Estimating tempo",
-  transcribe: "Transcribing notes",
-  preview: "Encoding previews",
-};
+const STAGES = new Set(["decode", "separate", "rhythm", "transcribe", "preview"]);
 
 export function Analyze({ filePath, transcribeParts, result, onDone, onExport, onBack }: AnalyzeProps) {
+  const { t } = useI18n();
   const [progress, setProgress] = useState<ProgressPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
@@ -47,19 +43,23 @@ export function Analyze({ filePath, transcribeParts, result, onDone, onExport, o
   if (error) {
     return (
       <section className="analyze">
-        <p className="error">Analysis failed: {error}</p>
+        <p className="error">{t("analyze.failed", { error })}</p>
         <button className="btn" onClick={onBack}>
-          ← Back
+          {t("common.back")}
         </button>
       </section>
     );
   }
 
   if (!result) {
-    const label = progress ? STAGE_LABELS[progress.stage] ?? progress.stage : "Starting…";
+    const label = progress
+      ? STAGES.has(progress.stage)
+        ? t(`stage.${progress.stage}`)
+        : progress.stage
+      : t("analyze.starting");
     return (
       <section className="analyze analyzing">
-        <h2>Analyzing</h2>
+        <h2>{t("analyze.analyzing")}</h2>
         <p className="filename">{filePath.split("/").pop()}</p>
         <div className="progress-track">
           <div className="progress-fill" style={{ width: `${progress?.pct ?? 4}%` }} />
@@ -68,10 +68,7 @@ export function Analyze({ filePath, transcribeParts, result, onDone, onExport, o
           {label}
           {progress?.msg ? ` — ${progress.msg}` : ""}
         </p>
-        <p className="hint">
-          First run downloads the AI models (separation, pitch, piano, beats);
-          later runs use the cache and are faster.
-        </p>
+        <p className="hint">{t("analyze.firstRunHint")}</p>
       </section>
     );
   }
@@ -80,19 +77,22 @@ export function Analyze({ filePath, transcribeParts, result, onDone, onExport, o
     <section className="analyze">
       <div className="analyze-head">
         <div>
-          <h2>Detected parts</h2>
+          <h2>{t("analyze.detectedParts")}</h2>
           <p className="meta-line">
-            {result.parts.length} parts · ~{Math.round(result.rhythm.tempo)} BPM ·{" "}
-            {result.rhythm.time_signature}
+            {t("analyze.meta", {
+              n: result.parts.length,
+              bpm: Math.round(result.rhythm.tempo),
+              ts: result.rhythm.time_signature,
+            })}
           </p>
         </div>
         <button className="btn primary" onClick={onExport}>
-          Export →
+          {t("analyze.export")}
         </button>
       </div>
-      <PartsMixer result={result} />
+      <PartsMixer result={result} t={t} />
       <button className="btn ghost start-over" onClick={onBack}>
-        ← Start over
+        {t("analyze.startOver")}
       </button>
     </section>
   );
@@ -104,7 +104,7 @@ function formatTime(s: number): string {
   return `${m}:${sec.toString().padStart(2, "0")}`;
 }
 
-function PartsMixer({ result }: { result: AnalysisResult }) {
+function PartsMixer({ result, t }: { result: AnalysisResult; t: TFunc }) {
   const mixer = useRef<StemMixer | null>(null);
   const [ready, setReady] = useState(false);
   const [tracks, setTracks] = useState<Record<string, TrackState>>({});
@@ -193,12 +193,16 @@ function PartsMixer({ result }: { result: AnalysisResult }) {
         await m.play();
         setPlaying(true);
         setAudioDiag(
-          `playing ${m.loadedCount()} stems, context ${m.contextState()} @ ${m.contextRate()}Hz`,
+          t("mixer.playing", {
+            n: m.loadedCount(),
+            state: m.contextState(),
+            rate: m.contextRate(),
+          }),
         );
       }
       setPos(m.getPosition());
     } catch (e) {
-      setAudioDiag(`audio error: ${String(e)}`);
+      setAudioDiag(t("mixer.audioError", { error: String(e) }));
     }
   };
 
@@ -241,9 +245,9 @@ function PartsMixer({ result }: { result: AnalysisResult }) {
           return (
             <li key={part} className={`part ${dimmed ? "dimmed" : ""}`}>
               <span className="swatch" style={{ background: meta.color }} />
-              <span className="part-name">{meta.label}</span>
+              <span className="part-name">{t(`part.${part}`)}</span>
               {!result.pitched_parts.includes(part as PartName) && (
-                <span className="badge">audio only</span>
+                <span className="badge">{t("mixer.audioOnly")}</span>
               )}
               <div className="part-controls">
                 <button
@@ -254,7 +258,7 @@ function PartsMixer({ result }: { result: AnalysisResult }) {
                   }}
                   disabled={!ready}
                 >
-                  Solo
+                  {t("mixer.solo")}
                 </button>
                 <button
                   className={`tag ${st.muted ? "on" : ""}`}
@@ -264,7 +268,7 @@ function PartsMixer({ result }: { result: AnalysisResult }) {
                   }}
                   disabled={!ready}
                 >
-                  Mute
+                  {t("mixer.mute")}
                 </button>
                 <input
                   className="vol"
@@ -285,32 +289,33 @@ function PartsMixer({ result }: { result: AnalysisResult }) {
           );
         })}
       </ul>
-      {!ready && !loadInfo && <p className="hint">Loading stem audio…</p>}
+      {!ready && !loadInfo && <p className="hint">{t("mixer.loadingStems")}</p>}
       {loadInfo && (
         <p
           className={loadInfo.failed.length > 0 ? "error" : "hint"}
           style={{ textAlign: "left", whiteSpace: "pre-wrap" }}
         >
-          {`audio: ${loadInfo.loaded.length}/${
-            loadInfo.loaded.length + loadInfo.failed.length
-          } stems loaded`}
+          {t("mixer.audioLoaded", {
+            loaded: loadInfo.loaded.length,
+            total: loadInfo.loaded.length + loadInfo.failed.length,
+          })}
           {loadInfo.failed.length > 0 &&
-            ` — failed: ${loadInfo.failed
-              .map((f) => `${f.name} (${f.error})`)
-              .join(", ")}`}
-          {audioDiag ? ` · ${audioDiag}` : " · press ▶ for playback state"}
+            t("mixer.audioFailed", {
+              list: loadInfo.failed.map((f) => `${f.name} (${f.error})`).join(", "),
+            })}
+          {audioDiag ? ` · ${audioDiag}` : t("mixer.pressPlay")}
         </p>
       )}
       <div className="mixer-foot">
         <button className="btn" onClick={exportMix} disabled={!ready || mixing}>
-          {mixing ? "Exporting…" : "Export mix (mp3)"}
+          {mixing ? t("mixer.exporting") : t("mixer.exportMix")}
         </button>
         {mixPath && (
           <button className="link" onClick={() => reveal(mixPath)}>
-            Reveal
+            {t("common.reveal")}
           </button>
         )}
-        {mixError && <span className="error">Mix failed: {mixError}</span>}
+        {mixError && <span className="error">{t("mixer.mixFailed", { error: mixError })}</span>}
       </div>
     </div>
   );

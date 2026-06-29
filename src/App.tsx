@@ -5,6 +5,7 @@ import { Export } from "./routes/Export";
 import { Home } from "./routes/Home";
 import { RuntimeSetup } from "./routes/RuntimeSetup";
 import { runtimeStatus } from "./lib/ipc";
+import { useI18n } from "./lib/i18n";
 import type { AnalysisResult } from "./lib/types";
 import "./App.css";
 
@@ -14,6 +15,7 @@ type Screen = "home" | "analyze" | "export";
 type RuntimeState = "checking" | "needs-download" | "ready";
 
 function App() {
+  const { t, lang, setLang } = useI18n();
   const [runtime, setRuntime] = useState<RuntimeState>("checking");
   const [screen, setScreen] = useState<Screen>("home");
   const [filePath, setFilePath] = useState<string | null>(null);
@@ -44,17 +46,23 @@ function App() {
   return (
     <div className="app">
       <header className="app-bar">
-        <button className="brand" onClick={reset} title="Home">
+        <button className="brand" onClick={reset} title={t("app.home")}>
           Paper&nbsp;Echo
         </button>
-        <span className="tagline">Turn audio into editable sheet music</span>
+        <span className="tagline">{t("app.tagline")}</span>
+        <button
+          className="lang-toggle"
+          onClick={() => setLang(lang === "ja" ? "en" : "ja")}
+        >
+          {t("lang.switch")}
+        </button>
       </header>
 
       <main className="app-body">
         {runtime === "checking" && (
           <section className="runtime-setup">
             <div className="dropzone-icon">♪</div>
-            <p>起動中…</p>
+            <p>{t("app.starting")}</p>
           </section>
         )}
 

@@ -1,117 +1,125 @@
 # Paper Echo
 
-Turn audio into editable sheet music. Paper Echo separates an audio file into
-parts (bass, vocals, guitar, piano, drums, other) and drafts editable notation
-(MusicXML / MIDI) so you can finish in MuseScore, Dorico, or Sibelius. It makes a
-**draft**, not a final score — the goal is to cut ear-copy time by ~80%.
+音声を編集可能な楽譜に変換します。Paper Echo は音声ファイルを各パート（ベース・
+ボーカル・ギター・ピアノ・ドラム・その他）に分離し、編集可能な楽譜（MusicXML /
+MIDI）の下書きを作成します。仕上げは MuseScore / Dorico / Sibelius で行えます。
+これは最終的な楽譜ではなく **下書き** を作るツールで、耳コピの時間を約 80% 短縮
+することを目的としています。
 
-## Architecture
+## アーキテクチャ
 
-Three layers:
+3 層構成です。
 
-- **`src/`** — React + TypeScript + Vite frontend (Home → Analyze → Export).
-- **`src-tauri/`** — Tauri 2 / Rust backend. Spawns the Python pipeline as a
-  subprocess and streams its JSON progress to the UI.
-- **`python/paperecho/`** — ML pipeline (uv-managed venv):
-  decode (ffmpeg) → separate (Demucs `htdemucs_6s`, 6 stems) → rhythm → transcribe
-  → score (music21) → export, plus compressed audio previews for in-app playback.
-  - **Transcription is per-part:** **bass & vocals** use an onset-driven tracker
-    (attacks set note boundaries, pitch is filled in per span by the CREPE neural
-    f0 model — repeated same-pitch notes survive); **piano** uses the ByteDance
-    high-resolution piano model (polyphonic, clean chords); **guitar** uses
-    Spotify Basic Pitch. You pick which parts to notate up front (all are still
-    separated and playable).
-  - **Rhythm** uses `beat_this` (transformer beats + downbeats; librosa fallback),
-    with local octave-jump correction so a busy section can't double the tempo.
+- **`src/`** — React + TypeScript + Vite のフロントエンド（Home → Analyze →
+  Export）。
+- **`src-tauri/`** — Tauri 2 / Rust のバックエンド。Python パイプラインをサブ
+  プロセスとして起動し、その JSON 進捗を UI にストリーミングします。
+- **`python/paperecho/`** — ML パイプライン（uv 管理の venv）:
+  デコード (ffmpeg) → 分離 (Demucs `htdemucs_6s`、6 ステム) → リズム → 採譜
+  → 楽譜化 (music21) → 書き出し。さらにアプリ内再生用の圧縮音声プレビューを生成
+  します。
+  - **採譜はパートごと:** **ベースとボーカル** はオンセット駆動のトラッカー
+    （アタックが音符の境界を決め、ピッチは各区間ごとに CREPE ニューラル f0 モデルで
+    補完——同じ音高の連続音も保持される）；**ピアノ** は ByteDance の高解像度ピアノ
+    モデル（ポリフォニック、きれいな和音）；**ギター** は Spotify Basic Pitch を
+    使用します。楽譜化するパートは最初に選べます（選ばなくても全パートは分離・再生
+    可能）。
+  - **リズム** は `beat_this`（Transformer によるビート＋ダウンビート、librosa
+    フォールバックあり）を使い、局所的なオクターブジャンプ補正により、音数の多い
+    区間でテンポが倍にならないようにしています。
 
-The Rust↔Python contract: a long-lived `python -m paperecho.pipeline serve`
-process takes one JSON request per line on stdin and emits one JSON object per
-line on stdout (`progress` / `done` / `error`); the same `analyze` / `export` /
-`preview` subcommands also run standalone for CLI use. Artifacts are written to
-`app_data_dir/jobs/<id>/`.
+Rust↔Python の契約: 常駐する `python -m paperecho.pipeline serve` プロセスが、
+stdin の 1 行ごとに 1 つの JSON リクエストを受け取り、stdout に 1 行ごとに 1 つの
+JSON オブジェクト（`progress` / `done` / `error`）を出力します。同じ `analyze` /
+`export` / `preview` サブコマンドは CLI 用に単独でも実行できます。成果物は
+`app_data_dir/jobs/<id>/` に書き出されます。
 
-## Workflow
+## 操作の流れ
 
-1. **Home** — drop an audio file. Choose which pitched parts to notate (bass /
-   vocals / guitar / piano); unchecking parts you don't need (e.g. piano, the
-   slowest) speeds up analysis. Every part is still separated and auditionable.
-2. **Analyze** — watch progress, then audition the separated stems in a synced
-   mixer (mute / solo / volume per part, plus a click track) and export a mixdown.
-3. **Export** — pick parts and formats (MusicXML / MIDI / PDF), with a live score
-   preview and manual reading aids: **Tempo grid** (fixed metronomic vs variable
-   live tempo), **Tempo** ½×/1×/2×, **Beat nudge** (±beats), **Key** override, and
-   **Octave** shift — all applied at export time on the cached job (no re-analyze).
+1. **Home** — 音声ファイルをドロップします。楽譜化する音程付きパート（ベース /
+   ボーカル / ギター / ピアノ）を選びます。不要なパート（例：最も遅いピアノ）の
+   チェックを外すと解析が速くなります。チェックを外しても全パートは分離・試聴
+   できます。
+2. **Analyze** — 進捗を確認し、同期ミキサーで分離されたステムを試聴します
+   （パートごとのミュート / ソロ / 音量、クリックトラック付き）。ミックスダウンの
+   書き出しも可能です。
+3. **Export** — パートとフォーマット（MusicXML / MIDI / PDF）を選びます。ライブ
+   楽譜プレビューと、手動の読み取り補助があります: **テンポグリッド**（固定の
+   メトロノーム / 可変のライブテンポ）、**テンポ** ½×/1×/2×、**拍のずらし**
+   （±拍）、**調** の上書き、**オクターブ** シフト。すべてキャッシュ済みジョブに
+   対して書き出し時に適用されます（再解析不要）。
 
-## Prerequisites
+## 必要なもの
 
-- Node 20+, Rust (stable), Python 3.11, [uv](https://docs.astral.sh/uv/), ffmpeg.
+- Node 20+、Rust（stable）、Python 3.11、[uv](https://docs.astral.sh/uv/)、ffmpeg。
 
-## Setup
+## セットアップ
 
 ```sh
-# Frontend deps (also auto-downloads a static ffmpeg into
-# src-tauri/resources-arm64/bin via the postinstall step)
+# フロントエンドの依存（postinstall で静的 ffmpeg を
+# src-tauri/resources-arm64/bin に自動ダウンロードします）
 npm install
 
-# Python pipeline deps (creates python/.venv)
+# Python パイプラインの依存（python/.venv を作成）
 cd python && uv sync && cd ..
 ```
 
-> The bundled static `ffmpeg` is not committed; `npm install` fetches it via the
-> `ffmpeg-static` package and `scripts/stage-ffmpeg.mjs` stages it. Re-run with
-> `npm run stage:ffmpeg` if needed.
+> 同梱する静的 `ffmpeg` はリポジトリにコミットしていません。`npm install` 時に
+> `ffmpeg-static` パッケージ経由で取得し、`scripts/stage-ffmpeg.mjs` が配置します。
+> 必要に応じて `npm run stage:ffmpeg` で再実行できます。
 
-## Run
+## 実行
 
 ```sh
 npm run tauri dev
 ```
 
-Running from source, the first analyse downloads the AI models — Demucs
-separation (~hundreds of MB), the CREPE pitch model, the ByteDance piano model
-(~170 MB), and `beat_this` — all cached afterwards. (Packaged `.dmg` builds
-**bundle these models** in the downloaded runtime, so their first analyse is
-fully offline — see Distribution.)
+ソースから実行する場合、初回解析時に AI モデルをダウンロードします——Demucs の
+分離モデル（数百 MB）、CREPE ピッチモデル、ByteDance ピアノモデル（約 170 MB）、
+`beat_this`——いずれも以降はキャッシュされます。（パッケージ済みの `.dmg`
+ビルドはダウンロードされるランタイムに **これらのモデルを同梱** するため、初回解析
+も完全オフラインです——「配布」を参照。）
 
-### Useful env vars
+### 便利な環境変数
 
-- `PAPER_ECHO_PYTHON_DIR` — override the `python/` project location.
-- `PAPER_ECHO_DEVICE` — device for separation, CREPE pitch detection, and the
-  ByteDance piano model. **Auto-detects a GPU (Apple `mps` / CUDA) by default**,
-  falling back to CPU; set `cpu`/`mps`/`cuda` to override. On Apple Silicon the
-  GPU runs the piano model (the slowest stage) ~1.75× faster than CPU.
-- `PAPER_ECHO_SHIFTS` — Demucs test-time augmentation passes (default `2`).
-  Higher = cleaner separation (less smeared guitar/piano attacks) but ~(1+N)×
-  slower; set `0` for fastest separation.
-- `PAPER_ECHO_RUNTIME_URL` / `PAPER_ECHO_RUNTIME_SHA256` — override the first-run
-  runtime download URL / expected checksum (packaged builds only; see below).
+- `PAPER_ECHO_PYTHON_DIR` — `python/` プロジェクトの場所を上書きします。
+- `PAPER_ECHO_DEVICE` — 分離・CREPE ピッチ検出・ByteDance ピアノモデルで使うデバイス。
+  **既定では GPU（Apple `mps` / CUDA）を自動検出** し、なければ CPU にフォール
+  バックします。`cpu`/`mps`/`cuda` で上書き可能。Apple Silicon では GPU がピアノ
+  モデル（最も遅い工程）を CPU の約 1.75 倍速で処理します。
+- `PAPER_ECHO_SHIFTS` — Demucs のテスト時オーグメンテーション回数（既定 `2`）。
+  大きいほど分離がきれい（ギター/ピアノのアタックのにじみが減る）ですが、約 (1+N)
+  倍遅くなります。最速にするには `0`。
+- `PAPER_ECHO_RUNTIME_URL` / `PAPER_ECHO_RUNTIME_SHA256` — 初回起動時のランタイム
+  ダウンロード URL / 期待されるチェックサムを上書きします（パッケージ済みビルド
+  のみ。下記参照）。
 
-## Distribution
+## 配布
 
-Packaged (`.dmg`) builds don't bundle the ~1 GB Python pipeline — they download a
-slimmed, self-contained runtime **once on first launch** (a "初回セットアップ"
-screen with progress), from GitHub Releases, into `<app_data>/runtime-<version>/`.
-This keeps the DMG to tens of MB. The runtime bundles the AI model weights too, so
-the **first analyse runs fully offline** (no further downloads). Builds are
-unsigned by default (right-click → Open once); Developer ID signing + notarisation
-is wired and env-driven. Build/release steps, slimming, and notarisation are in
-[`DISTRIBUTION.md`](DISTRIBUTION.md). macOS Apple Silicon (arm64) only.
+パッケージ済み（`.dmg`）ビルドは約 1 GB の Python パイプラインを同梱しません。
+代わりに、スリム化された自己完結ランタイムを **初回起動時に一度だけ**（進捗付きの
+「初回セットアップ」画面で）GitHub Releases から `<app_data>/runtime-<version>/`
+にダウンロードします。これにより DMG は数十 MB に収まります。ランタイムは AI
+モデルの重みも同梱するため、**初回解析も完全オフライン** で動作します（追加の
+ダウンロードなし）。ビルドは既定で未署名（初回は右クリック →「開く」）；Developer
+ID 署名 + 公証も環境変数で有効化できます。ビルド/リリース手順・スリム化・公証は
+[`DISTRIBUTION.md`](DISTRIBUTION.md) を参照。macOS Apple Silicon（arm64）のみ対応。
 
-## Test the pipeline directly
+## パイプラインを直接テストする
 
 ```sh
 cd python
-# --transcribe-parts limits which pitched parts are notated (default: all)
+# --transcribe-parts で楽譜化する音程付きパートを限定（既定: 全部）
 ./.venv/bin/python -m paperecho.pipeline analyze --input song.mp3 --job-dir /tmp/job \
     --transcribe-parts bass,vocals
-# export reading aids: --tempo-mode fixed|variable, --tempo-mult, --beat-offset,
+# 書き出しの読み取り補助: --tempo-mode fixed|variable, --tempo-mult, --beat-offset,
 # --key-sharps, --octave-shift
 ./.venv/bin/python -m paperecho.pipeline export  --job-dir /tmp/job \
     --parts bass,vocals --formats musicxml,midi --tempo-mode fixed
 ```
 
-## Status / scope
+## ステータス / スコープ
 
-MVP: pitched parts (bass/vocals/guitar/piano) get notation; drums are
-audio-only. PDF export requires a MuseScore CLI on PATH. Out of scope: cloud
-sync, accounts, DAW features.
+MVP: 音程付きパート（ベース/ボーカル/ギター/ピアノ）が楽譜化され、ドラムは音声
+のみです。PDF 書き出しには PATH 上の MuseScore CLI が必要です。スコープ外: クラウド
+同期、アカウント、DAW 機能。

@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 import { OpenSheetMusicDisplay } from "opensheetmusicdisplay";
 
+import { useI18n } from "../lib/i18n";
+
 interface ScorePreviewProps {
   musicxml: string | null;
   loading?: boolean;
@@ -8,6 +10,7 @@ interface ScorePreviewProps {
 
 /** Renders a MusicXML string as engraved notation via OpenSheetMusicDisplay. */
 export function ScorePreview({ musicxml, loading }: ScorePreviewProps) {
+  const { t } = useI18n();
   const container = useRef<HTMLDivElement>(null);
   const osmd = useRef<OpenSheetMusicDisplay | null>(null);
 
@@ -39,7 +42,7 @@ export function ScorePreview({ musicxml, loading }: ScorePreviewProps) {
 
   return (
     <div className="score-preview-wrap">
-      {loading && <div className="score-preview-loading">Rendering…</div>}
+      {loading && <div className="score-preview-loading">{t("score.rendering")}</div>}
       <div className="score-preview" ref={container} />
     </div>
   );

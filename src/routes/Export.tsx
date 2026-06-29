@@ -12,6 +12,7 @@ import {
   type ScoreControls,
   type TempoMode,
 } from "../lib/ipc";
+import { useI18n } from "../lib/i18n";
 import {
   PART_META,
   PART_ORDER,
@@ -28,12 +29,12 @@ interface ExportProps {
   onHome: () => void;
 }
 
-const FORMAT_OPTIONS: { id: OutputFormat; label: string; note?: string }[] = [
+const FORMAT_OPTIONS: { id: OutputFormat; label: string; noteKey?: string }[] = [
   { id: "musicxml", label: "MusicXML" },
   { id: "midi", label: "MIDI" },
   { id: "wav", label: "WAV" },
   { id: "mp3", label: "MP3" },
-  { id: "pdf", label: "PDF", note: "needs MuseScore" },
+  { id: "pdf", label: "PDF", noteKey: "format.needsMuseScore" },
 ];
 
 // Derived (synthetic) parts built from another part's notes — offered in Export
@@ -63,6 +64,7 @@ const KEY_OPTIONS: { sharps: number; label: string }[] = [
 ];
 
 export function Export({ result, onBack, onHome }: ExportProps) {
+  const { t } = useI18n();
   const derivedParts = useMemo(
     () =>
       (Object.keys(DERIVED_SOURCE) as PartName[]).filter((d) =>
@@ -221,11 +223,11 @@ export function Export({ result, onBack, onHome }: ExportProps) {
 
   return (
     <section className="export">
-      <h2>Export</h2>
+      <h2>{t("export.title")}</h2>
 
       <div className="export-grid">
         <fieldset>
-          <legend>Parts</legend>
+          <legend>{t("export.parts")}</legend>
           {orderedParts.map((part) => {
             const meta = PART_META[part as PartName];
             const isScoreable = scoreable.has(part);
@@ -238,16 +240,16 @@ export function Export({ result, onBack, onHome }: ExportProps) {
                   onChange={() => togglePart(part)}
                 />
                 <span className="swatch" style={{ background: meta.color }} />
-                {meta.label}
-                {isDerived && <span className="badge">notation only</span>}
-                {!isScoreable && <span className="badge">audio only</span>}
+                {t(`part.${part}`)}
+                {isDerived && <span className="badge">{t("export.notationOnly")}</span>}
+                {!isScoreable && <span className="badge">{t("export.audioOnly")}</span>}
               </label>
             );
           })}
         </fieldset>
 
         <fieldset>
-          <legend>Formats</legend>
+          <legend>{t("export.formats")}</legend>
           {FORMAT_OPTIONS.map((f) => (
             <label key={f.id} className="check">
               <input
@@ -256,32 +258,28 @@ export function Export({ result, onBack, onHome }: ExportProps) {
                 onChange={() => toggleFormat(f.id)}
               />
               {f.label}
-              {f.note && <span className="badge">{f.note}</span>}
+              {f.noteKey && <span className="badge">{t(f.noteKey)}</span>}
             </label>
           ))}
         </fieldset>
       </div>
 
       <div className="tempo-row">
-        <span className="tempo-label">Tempo grid</span>
+        <span className="tempo-label">{t("export.tempoGrid")}</span>
         <Segmented
           options={["fixed", "variable"] as TempoMode[]}
           value={tempoMode}
           onChange={setTempoMode}
-          label={(m) => (m === "fixed" ? "Fixed" : "Variable")}
+          label={(m) => (m === "fixed" ? t("seg.fixed") : t("seg.variable"))}
         />
         <span className="tempo-value muted">
-          {tempoMode === "fixed" ? "steady metronomic grid" : "follow live tempo"}
+          {tempoMode === "fixed" ? t("export.gridFixed") : t("export.gridVariable")}
         </span>
       </div>
-      <p className="hint tempo-hint">
-        Fixed snaps every bar to a steady tempo — cleaner for studio takes and
-        immune to beat-tracking wobble. Use Variable for live/rubato recordings
-        where the tempo genuinely drifts.
-      </p>
+      <p className="hint tempo-hint">{t("export.gridHint")}</p>
 
       <div className="tempo-row">
-        <span className="tempo-label">Tempo</span>
+        <span className="tempo-label">{t("export.tempo")}</span>
         <Segmented
           options={[0.5, 1, 2]}
           value={tempoMult}
@@ -290,31 +288,27 @@ export function Export({ result, onBack, onHome }: ExportProps) {
         />
         <span className="tempo-value">
           {effectiveTempo} BPM
-          {tempoMult !== 1 && <span className="muted"> (detected {detectedTempo})</span>}
+          {tempoMult !== 1 && (
+            <span className="muted"> {t("export.detected", { n: detectedTempo })}</span>
+          )}
         </span>
       </div>
-      <p className="hint tempo-hint">
-        Tempo octave (e.g. 80 vs 160) is ambiguous — if the note values look
-        doubled or halved, switch ½×/2×.
-      </p>
+      <p className="hint tempo-hint">{t("export.tempoHint")}</p>
 
       <div className="tempo-row">
-        <span className="tempo-label">Beat nudge</span>
+        <span className="tempo-label">{t("export.beatNudge")}</span>
         <Segmented
           options={[-3, -2, -1, -0.5, -0.25, 0, 0.25, 0.5, 1, 2, 3]}
           value={beatOffset}
           onChange={setBeatOffset}
           label={(off) => (off === 0 ? "0" : off > 0 ? `+${off}` : String(off))}
         />
-        <span className="tempo-value muted">beats</span>
+        <span className="tempo-value muted">{t("export.beats")}</span>
       </div>
-      <p className="hint tempo-hint">
-        If everything sits a beat off (e.g. notes land on the off-beat / measure
-        heads are rests), nudge the grid by ±¼ or ±½ beat to line it up.
-      </p>
+      <p className="hint tempo-hint">{t("export.beatHint")}</p>
 
       <div className="tempo-row">
-        <span className="tempo-label">Key</span>
+        <span className="tempo-label">{t("export.key")}</span>
         <select
           className="key-select"
           value={keySharps === null ? "auto" : String(keySharps)}
@@ -323,7 +317,7 @@ export function Export({ result, onBack, onHome }: ExportProps) {
             setKeySharps(v === "auto" ? null : Number(v));
           }}
         >
-          <option value="auto">Auto (detect)</option>
+          <option value="auto">{t("export.keyAuto")}</option>
           {KEY_OPTIONS.map((k) => (
             <option key={k.sharps} value={k.sharps}>
               {k.label}
@@ -331,29 +325,22 @@ export function Export({ result, onBack, onHome }: ExportProps) {
           ))}
         </select>
         <span className="tempo-value muted">
-          {keySharps === null ? "estimated from the notes" : "fixed"}
+          {keySharps === null ? t("export.keyEstimated") : t("export.keyFixed")}
         </span>
       </div>
-      <p className="hint tempo-hint">
-        Auto key detection often misses — if the key signature is wrong, pick the
-        real key here.
-      </p>
+      <p className="hint tempo-hint">{t("export.keyHint")}</p>
 
       <div className="tempo-row">
-        <span className="tempo-label">Octave</span>
+        <span className="tempo-label">{t("export.octave")}</span>
         <Segmented
           options={[-2, -1, 0, 1, 2]}
           value={octaveShift}
           onChange={setOctaveShift}
           label={(oct) => (oct === 0 ? "0" : oct > 0 ? `+${oct}` : String(oct))}
         />
-        <span className="tempo-value muted">octaves</span>
+        <span className="tempo-value muted">{t("export.octaves")}</span>
       </div>
-      <p className="hint tempo-hint">
-        Shifts the written notes up/down by octaves to read them in a comfortable
-        register (e.g. a low vocal that sits under the staff). Applies to the
-        parts you export — set 0 when exporting several parts together.
-      </p>
+      <p className="hint tempo-hint">{t("export.octaveHint")}</p>
 
       {previewPart && (
         <div className="preview-block">
@@ -366,12 +353,12 @@ export function Export({ result, onBack, onHome }: ExportProps) {
                     className={`seg ${p === previewPart ? "on" : ""}`}
                     onClick={() => setPreviewSel(p)}
                   >
-                    {PART_META[p].label}
+                    {t(`part.${p}`)}
                   </button>
                 ))}
               </div>
             ) : (
-              <span>Preview · {PART_META[previewPart].label}</span>
+              <span>{t("export.previewSingle", { label: t(`part.${previewPart}`) })}</span>
             )}
             {previewStemPart && (
               <StemPlayer
@@ -387,10 +374,10 @@ export function Export({ result, onBack, onHome }: ExportProps) {
 
       <div className="export-actions">
         <button className="btn ghost" onClick={onBack}>
-          ← Back
+          {t("common.back")}
         </button>
         <button className="btn primary" onClick={run} disabled={!canRun}>
-          {running ? "Exporting…" : "Choose folder & Export…"}
+          {running ? t("export.exporting") : t("export.chooseFolder")}
         </button>
       </div>
 
@@ -400,11 +387,11 @@ export function Export({ result, onBack, onHome }: ExportProps) {
         </div>
       )}
 
-      {error && <p className="error">Export failed: {error}</p>}
+      {error && <p className="error">{t("export.failed", { error })}</p>}
 
       {artifacts && (
         <div className="results">
-          <h3>{written.length} file(s) saved</h3>
+          <h3>{t("export.savedCount", { n: written.length })}</h3>
           {destDir && (
             <div className="dest-row">
               <span className="mono dest">{destDir}</span>
@@ -413,7 +400,7 @@ export function Export({ result, onBack, onHome }: ExportProps) {
                   className="link"
                   onClick={() => written[0].path && reveal(written[0].path)}
                 >
-                  Open folder
+                  {t("export.openFolder")}
                 </button>
               )}
             </div>
@@ -425,14 +412,14 @@ export function Export({ result, onBack, onHome }: ExportProps) {
                   {a.part}.{a.format === "midi" ? "mid" : a.format}
                 </span>
                 <button className="link" onClick={() => a.path && reveal(a.path)}>
-                  Reveal
+                  {t("common.reveal")}
                 </button>
               </li>
             ))}
           </ul>
           {skipped.length > 0 && (
             <details className="skipped">
-              <summary>{skipped.length} skipped</summary>
+              <summary>{t("export.skippedCount", { n: skipped.length })}</summary>
               <ul>
                 {skipped.map((a) => (
                   <li key={`${a.part}-${a.format}`}>
@@ -443,7 +430,7 @@ export function Export({ result, onBack, onHome }: ExportProps) {
             </details>
           )}
           <button className="btn ghost" onClick={onHome}>
-            Done
+            {t("common.done")}
           </button>
         </div>
       )}
@@ -461,6 +448,7 @@ function fmtTime(s: number): string {
 // the previewed part while reading its notation, to check the transcription.
 // Reuses the (confirmed-working) StemMixer with a one-entry stem map.
 function StemPlayer({ part, stemPath }: { part: string; stemPath: string }) {
+  const { t } = useI18n();
   const mixer = useRef<StemMixer | null>(null);
   const [ready, setReady] = useState(false);
   const [playing, setPlaying] = useState(false);
@@ -509,7 +497,10 @@ function StemPlayer({ part, stemPath }: { part: string; stemPath: string }) {
     }
   };
 
-  if (err) return <span className="hint preview-audio-err">audio: {err}</span>;
+  if (err)
+    return (
+      <span className="hint preview-audio-err">{t("mixer.audioError", { error: err })}</span>
+    );
 
   return (
     <span className="preview-audio">

@@ -2,7 +2,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { useEffect, useState } from "react";
 
 import { isSupportedAudio, pickAudioFile } from "../lib/ipc";
-import { PART_META } from "../lib/types";
+import { useI18n } from "../lib/i18n";
 
 interface HomeProps {
   onPick: (path: string, transcribeParts: string[]) => void;
@@ -12,6 +12,7 @@ interface HomeProps {
 const TRANSCRIBABLE = ["bass", "vocals", "guitar", "piano"] as const;
 
 export function Home({ onPick }: HomeProps) {
+  const { t } = useI18n();
   const [hover, setHover] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Which parts to notate. All on by default; unchecking (e.g. the slow piano)
@@ -27,7 +28,7 @@ export function Home({ onPick }: HomeProps) {
 
   const accept = (path: string) => {
     if (!isSupportedAudio(path)) {
-      setError("Unsupported file. Use mp3, wav, m4a, or aiff.");
+      setError(t("home.unsupported"));
       return;
     }
     setError(null);
@@ -67,14 +68,14 @@ export function Home({ onPick }: HomeProps) {
         tabIndex={0}
       >
         <div className="dropzone-icon">♪</div>
-        <h2>Drop an audio file</h2>
-        <p>or click to browse</p>
+        <h2>{t("home.drop")}</h2>
+        <p>{t("home.browse")}</p>
         <span className="formats">mp3 · wav · m4a · aiff</span>
       </div>
       {error && <p className="error">{error}</p>}
 
       <div className="transcribe-pick">
-        <span className="transcribe-label">Notate:</span>
+        <span className="transcribe-label">{t("home.notate")}</span>
         {TRANSCRIBABLE.map((p) => (
           <label key={p} className={`chip ${parts.has(p) ? "on" : ""}`}>
             <input
@@ -82,15 +83,11 @@ export function Home({ onPick }: HomeProps) {
               checked={parts.has(p)}
               onChange={() => toggle(p)}
             />
-            {PART_META[p].label}
+            {t(`part.${p}`)}
           </label>
         ))}
       </div>
-      <p className="hint">
-        Paper Echo separates the parts and drafts editable notation — finish it in
-        MuseScore, Dorico, or Sibelius. Uncheck parts you don't need to notate
-        (e.g. piano) to analyse faster — every part is still separated and playable.
-      </p>
+      <p className="hint">{t("home.hint")}</p>
     </section>
   );
 }

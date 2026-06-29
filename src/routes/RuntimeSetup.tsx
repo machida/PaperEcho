@@ -5,17 +5,18 @@ import {
   onRuntimeProgress,
   type RuntimeProgress,
 } from "../lib/ipc";
+import { useI18n } from "../lib/i18n";
 
 interface RuntimeSetupProps {
   /** Called once the runtime is installed and the pipeline is ready. */
   onReady: () => void;
 }
 
-const PHASE_LABEL: Record<RuntimeProgress["phase"], string> = {
-  download: "ダウンロード中",
-  verify: "検証中",
-  extract: "展開中",
-  done: "完了",
+const PHASE_KEY: Record<RuntimeProgress["phase"], string> = {
+  download: "runtime.download",
+  verify: "runtime.verify",
+  extract: "runtime.extract",
+  done: "runtime.done",
 };
 
 function mb(bytes: number): string {
@@ -25,6 +26,7 @@ function mb(bytes: number): string {
 /** First-run gate: the ~350 MB Python runtime isn't bundled, so fetch it once
  * (from GitHub Releases) before the app can analyse anything. */
 export function RuntimeSetup({ onReady }: RuntimeSetupProps) {
+  const { t } = useI18n();
   const [progress, setProgress] = useState<RuntimeProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -74,17 +76,14 @@ export function RuntimeSetup({ onReady }: RuntimeSetupProps) {
   return (
     <section className="runtime-setup">
       <div className="dropzone-icon">♪</div>
-      <h2>初回セットアップ</h2>
-      <p>
-        音楽解析エンジン（約 350 MB）を一度だけダウンロードします。
-        次回からはこの画面は出ません。
-      </p>
+      <h2>{t("runtime.title")}</h2>
+      <p>{t("runtime.desc")}</p>
 
       {error ? (
         <>
-          <p className="error">セットアップに失敗しました: {error}</p>
+          <p className="error">{t("runtime.failed", { error })}</p>
           <button className="btn primary" onClick={retry}>
-            再試行
+            {t("runtime.retry")}
           </button>
         </>
       ) : (
@@ -97,7 +96,7 @@ export function RuntimeSetup({ onReady }: RuntimeSetupProps) {
             />
           </div>
           <p className="runtime-status-line">
-            {progress ? PHASE_LABEL[progress.phase] : "準備中"}
+            {progress ? t(PHASE_KEY[progress.phase]) : t("runtime.preparing")}
             {progress && progress.phase === "download" && progress.total > 0
               ? ` … ${mb(progress.downloaded)} / ${mb(progress.total)} MB (${pct}%)`
               : progress && progress.phase === "download"

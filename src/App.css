@@ -60,6 +60,22 @@ body {
   font-size: 13px;
 }
 
+.lang-toggle {
+  margin-left: auto;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.lang-toggle:hover {
+  color: var(--text);
+  border-color: var(--text);
+}
+
 .app-body {
   flex: 1;
   overflow-y: auto;
