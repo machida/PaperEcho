@@ -19,9 +19,13 @@ src-tauri/target
 # Tauri auto-generated
 src-tauri/gen/schemas
 
-# Staged runtime + bundled binaries (build artifacts; ffmpeg is fetched by
-# scripts/fetch-ffmpeg.sh, the runtime is staged by scripts/build-python-dist.sh)
-src-tauri/resources-arm64
+# Staged runtime + bundled binaries (build artifacts; ffmpeg is staged by
+# scripts/stage-ffmpeg.mjs, the runtime is staged by scripts/build-python-dist.sh).
+# runtime.sha256 IS tracked: it's the tiny checksum the app bundles to verify the
+# downloaded runtime, so a clone must build with the correct value (and CI needs it
+# for tauri.conf's `resources`).
+src-tauri/resources-arm64/*
+!src-tauri/resources-arm64/runtime.sha256
 
 # Packaged runtime tarball (uploaded to GitHub Releases, not committed)
 dist-runtime
