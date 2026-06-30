@@ -17,8 +17,8 @@
 - `npm test`（Vitest）→ **12 passed**（新規）
 - `npm run typecheck` / `npm run lint` / `npm run build` → グリーン
 - `ruff check .`（Python lint, 新規）→ グリーン
-- 進捗の詳細は末尾の「タスクリスト」を参照（High 2 / Medium 4 完了 + ruff、
-  Low は L6 のみ保留）。
+- 進捗の詳細は末尾の「タスクリスト」を参照（**全項目対応済み**: High 2 / Medium 4
+  + ruff / Low 7。L6 の CSP も本番ビルドで実機検証済み）。
 
 ## 総評
 
@@ -143,16 +143,16 @@ Rust⇄Python の 1 行 JSON 契約、`ScoreOptions` への整形パラメータ
 - [x] **L3** `mixdown` を CLI サブコマンド（`--gains` JSON / `--dest`）として追加。
 - [x] **L4** `estimate_rhythm` のフォールバック時に `progress.log` で理由を stderr 出力。
 - [x] **L5** `assetProtocol.scope` から `$HOME/**` を除外。
-- [ ] **L6** 制限的な CSP を設定。**保留** — CSP を誤ると dev(Vite HMR)/本番ビルドの
-  両方が壊れるが、本環境では GUI スモークテストができない。適用前に下記の候補を
-  実機で検証すること:
+- [x] **L6** 制限的な CSP を `tauri.conf.json` に設定し、**本番ビルドで実機検証済み**
+  （2026-06-30: `npm run tauri build` → 起動し、画面表示・ステム再生・OSMD 楽譜
+  プレビューすべて正常。バイナリに CSP 注入を確認）:
   `default-src 'self'; connect-src 'self' ipc: http://ipc.localhost asset: http://asset.localhost; img-src 'self' asset: http://asset.localhost data:; media-src 'self' asset: http://asset.localhost; style-src 'self' 'unsafe-inline'; font-src 'self' data:`
-  （webview は外部 URL を読み込まない＝XSS 面は MusicXML→OSMD のみで限定的。優先度低。）
+  （dev は Vite 配信のため CSP 非適用＝検証は本番ビルドで実施。）
 - [x] **L7** Home ドロップゾーンに `onKeyDown`（Enter/Space）を追加。
 
-## 残課題（任意・優先度低）
+## 残課題
 
-- **L6（CSP）** — 上記のとおり実機スモークテスト後に適用（唯一の未対応項目）。
+- なし（High 2 / Medium 4 + ruff / Low 7、すべて対応済み）。
 
 ## スコープ外（記録のみ）
 
