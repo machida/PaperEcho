@@ -235,6 +235,20 @@ const en: Dict = {
 const MESSAGES: Record<Lang, Dict> = { ja, en };
 const STORAGE_KEY = "paperecho.lang";
 
+/** Pure lookup + `{token}` substitution: the active-language string, falling back
+ * to English, then the key itself. (Uses split/join, not `String.replaceAll`,
+ * whose lib target predates our tsconfig.) Exported for unit testing; the `t`
+ * from `useI18n()` is just this bound to the current language. */
+export function translate(lang: Lang, key: string, params?: Params): string {
+  let s = MESSAGES[lang][key] ?? MESSAGES.en[key] ?? key;
+  if (params) {
+    for (const [k, v] of Object.entries(params)) {
+      s = s.split(`{${k}}`).join(String(v));
+    }
+  }
+  return s;
+}
+
 function initialLang(): Lang {
   const saved = localStorage.getItem(STORAGE_KEY);
   if (saved === "ja" || saved === "en") return saved;
@@ -263,18 +277,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     setLangState(l);
   }, []);
 
-  const t = useCallback<TFunc>(
-    (key, params) => {
-      let s = MESSAGES[lang][key] ?? MESSAGES.en[key] ?? key;
-      if (params) {
-        for (const [k, v] of Object.entries(params)) {
-          s = s.split(`{${k}}`).join(String(v));
-        }
-      }
-      return s;
-    },
-    [lang],
-  );
+  const t = useCallback<TFunc>((key, params) => translate(lang, key, params), [lang]);
 
   return (
     <I18nContext.Provider value={{ lang, setLang, t }}>

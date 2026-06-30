@@ -5,7 +5,6 @@ boundaries and CREPE (a neural f0 model, via torchcrepe) labels the pitch within
 each span, so repeated same-pitch notes stay separate instead of merging into one
 sustain. Polyphonic parts (guitar, piano) use the Basic Pitch model, which
 detects onsets natively and handles chords — CREPE is monophonic and cannot.
-(librosa.pyin remains in `transcribe_mono` as a lightweight fallback.)
 """
 
 from __future__ import annotations
@@ -38,85 +37,6 @@ def transcribe_part(stem_wav: str | Path, part: str) -> list[dict]:
     if part == "piano":
         return transcribe_piano(stem_wav)
     return transcribe(stem_wav, part=part)
-
-
-def transcribe_mono(stem_wav: str | Path, part: str) -> list[dict]:
-    """Monophonic f0 transcription via pYIN. Returns {start,end,pitch,velocity}.
-
-    Tracks one fundamental per frame, smooths it to kill brief octave slips, then
-    groups runs of the same semitone into notes (gating unvoiced frames as rests).
-    """
-    import librosa
-    import numpy as np
-
-    from .preprocess import noise_gate
-
-    fmin, fmax = _MONO_RANGE.get(part, (60.0, 1200.0))
-    y, sr = librosa.load(str(stem_wav), sr=_PYIN_SR, mono=True)
-    y = noise_gate(y, sr)  # remove inter-note bleed before tracking
-
-    f0, voiced, _vprob = librosa.pyin(
-        y, fmin=fmin, fmax=fmax, sr=sr, hop_length=_PYIN_HOP
-    )
-    times = librosa.times_like(f0, sr=sr, hop_length=_PYIN_HOP)
-    rms = librosa.feature.rms(y=y, hop_length=_PYIN_HOP)[0]
-
-    # pYIN tracks pitch but not re-articulations: a repeated note on the same
-    # pitch reads as one long sustain. Detect attacks separately and split notes
-    # there. Onsets use a finer hop (better timing than pYIN's 64 ms frames) and
-    # backtrack so each onset sits at the true start of the attack — this is what
-    # makes notes land on the right beat.
-    onset_times = sorted(
-        float(o)
-        for o in librosa.onset.onset_detect(
-            y=y, sr=sr, hop_length=512, backtrack=True, units="time"
-        )
-    )
-
-    # Rounded semitone per frame; NaN where unvoiced.
-    midi = np.full(len(f0), np.nan)
-    valid = voiced & ~np.isnan(f0)
-    midi[valid] = np.round(librosa.hz_to_midi(f0[valid]))
-    midi = _median_smooth(midi, 5)
-
-    frame_dur = _PYIN_HOP / sr
-    notes: list[dict] = []
-    cur: dict | None = None
-    oi = 0
-    for i, t in enumerate(times):
-        # Consume any onset landing in this frame; keep its precise time.
-        onset_t = None
-        while oi < len(onset_times) and onset_times[oi] < float(t) + frame_dur:
-            onset_t = onset_times[oi]
-            oi += 1
-
-        pitch = midi[i]
-        if np.isnan(pitch):
-            cur = _close(cur, notes)
-            continue
-        pitch = int(pitch)
-        if cur is not None and cur["pitch"] == pitch and onset_t is None:
-            cur["end"] = float(t)
-            cur["_rms"].append(float(rms[i]) if i < len(rms) else 0.0)
-        else:
-            if cur is not None and onset_t is not None:
-                cur["end"] = onset_t  # butt the previous note up to the attack
-            cur = _close(cur, notes)
-            start = onset_t if onset_t is not None else float(t)
-            cur = {"start": start, "end": max(start, float(t)), "pitch": pitch,
-                   "_rms": [float(rms[i]) if i < len(rms) else 0.0]}
-    _close(cur, notes)
-
-    # Drop fragments shorter than a 16th-ish; scale velocity from loudness.
-    peak = max((max(n["_rms"]) for n in notes), default=1.0) or 1.0
-    out = []
-    for n in notes:
-        if n["end"] - n["start"] < 0.10:
-            continue
-        vel = int(max(1, min(127, round((max(n["_rms"]) / peak) * 110 + 12))))
-        out.append({"start": round(n["start"], 4), "end": round(n["end"], 4),
-                    "pitch": n["pitch"], "velocity": vel})
-    return out
 
 
 # --- Onset-driven bass transcription -------------------------------------------
@@ -242,7 +162,7 @@ def transcribe_onset(stem_wav: str | Path, part: str = "bass") -> list[dict]:
     # 2-4. One note per onset span; last span runs to the end of audio.
     bounds = onsets + [duration]
     notes: list[dict] = []
-    for start, end in zip(bounds, bounds[1:]):
+    for start, end in zip(bounds, bounds[1:], strict=False):
         seg = (r_times >= start) & (r_times < end)
         seg_rms, seg_t = rms[seg], r_times[seg]
         if seg_rms.size == 0:
@@ -277,25 +197,6 @@ def transcribe_bass_onset(stem_wav: str | Path) -> list[dict]:
     """Bass alias for the onset-driven transcriber (kept for callers/tests)."""
     return transcribe_onset(stem_wav, "bass")
 
-
-def _close(cur: dict | None, notes: list[dict]) -> None:
-    if cur is not None:
-        notes.append(cur)
-    return None
-
-
-def _median_smooth(values, window: int):
-    import numpy as np
-
-    n = len(values)
-    half = window // 2
-    out = values.copy()
-    for i in range(n):
-        lo, hi = max(0, i - half), min(n, i + half + 1)
-        seg = values[lo:hi]
-        seg = seg[~np.isnan(seg)]
-        out[i] = np.median(seg) if seg.size else np.nan
-    return out
 
 # Per-part Basic Pitch tuning. Frequencies in Hz, note length in milliseconds.
 # Constraining the frequency range to each instrument's tessitura removes a lot
@@ -361,7 +262,8 @@ def transcribe(stem_wav: str | Path, part: str | None = None) -> list[dict]:
     # Gate inter-note bleed first, then hand the cleaned audio to Basic Pitch
     # (which only reads from a path) via a temp wav.
     y, sr = librosa.load(str(stem_wav), sr=None, mono=True)
-    gated = tempfile.mktemp(suffix=".wav")
+    fd, gated = tempfile.mkstemp(suffix=".wav")  # mkstemp: no name-reservation race
+    os.close(fd)  # soundfile writes by path; we only need the unique name
     sf.write(gated, noise_gate(y, sr), sr)
 
     # basic-pitch prints progress/debug to stdout; keep our JSON stdout clean.

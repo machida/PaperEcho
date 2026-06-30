@@ -9,11 +9,30 @@
 
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
-use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
+use std::process::{Child, ChildStdin, Command, Stdio};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError};
 use std::sync::{Mutex, OnceLock};
+use std::time::Duration;
 
 use serde_json::Value;
 use tauri::{Emitter, Window};
+
+/// Max time to wait for *any* line from the pipeline before treating it as hung
+/// and killing it (so the next request respawns a fresh process). Resets on each
+/// line received, so it's an inter-message heartbeat, not a total deadline — it
+/// must exceed the longest silent stretch, which is the separation call (one
+/// coarse milestone, then minutes of work). Generous default; override with
+/// `PAPER_ECHO_PIPELINE_TIMEOUT_SECS` (0/invalid → default).
+const DEFAULT_TIMEOUT_SECS: u64 = 600;
+
+fn pipeline_timeout() -> Duration {
+    let secs = std::env::var("PAPER_ECHO_PIPELINE_TIMEOUT_SECS")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .filter(|&s| s > 0)
+        .unwrap_or(DEFAULT_TIMEOUT_SECS);
+    Duration::from_secs(secs)
+}
 
 /// Resolved at app setup to the bundled `python/` resources in a packaged build.
 static PYTHON_DIR: OnceLock<PathBuf> = OnceLock::new();
@@ -129,11 +148,20 @@ fn classify_line(line: &str) -> PipelineLine {
     }
 }
 
-/// The persistent Python process and its piped stdin/stdout.
+/// The persistent Python process: its stdin (we write requests) and a channel
+/// fed by a dedicated reader thread (so the request loop can wait with a timeout
+/// rather than block forever on a hung process — std pipes have no read timeout).
 struct Server {
-    _child: Child,
+    child: Child,
     stdin: ChildStdin,
-    stdout: BufReader<ChildStdout>,
+    rx: Receiver<PipelineLine>,
+}
+
+impl Server {
+    /// Kill the child so its stdout closes and the reader thread exits.
+    fn kill(&mut self) {
+        let _ = self.child.kill();
+    }
 }
 
 fn server_slot() -> &'static Mutex<Option<Server>> {
@@ -165,18 +193,41 @@ fn spawn_server() -> Result<Server, String> {
         .map_err(|e| format!("failed to start python ({}): {e}", py.display()))?;
 
     let stdin = child.stdin.take().ok_or("no stdin for python process")?;
-    let stdout = BufReader::new(child.stdout.take().ok_or("no stdout for python process")?);
-    Ok(Server {
-        _child: child,
-        stdin,
-        stdout,
-    })
+    let stdout = child.stdout.take().ok_or("no stdout for python process")?;
+
+    // Reader thread: classify each stdout line and forward it. Lets `request`
+    // wait with a timeout (channel recv) instead of an un-cancellable read_line.
+    // The sender drops (closing the channel) on EOF/read error — which `request`
+    // sees as Disconnected.
+    let (tx, rx) = mpsc::channel::<PipelineLine>();
+    std::thread::spawn(move || {
+        let mut reader = BufReader::new(stdout);
+        let mut buf = String::new();
+        loop {
+            buf.clear();
+            match reader.read_line(&mut buf) {
+                Ok(0) | Err(_) => break, // EOF or read error -> close the channel
+                Ok(_) => {
+                    // Forward every classified line (incl. Ignore) so any output
+                    // counts as a liveness heartbeat for the timeout below.
+                    if tx.send(classify_line(&buf)).is_err() {
+                        break; // request side gone
+                    }
+                }
+            }
+        }
+    });
+
+    Ok(Server { child, stdin, rx })
 }
 
 /// Send one request to the persistent Python process, emitting each progress
 /// object on `progress_event`, and return the `done` payload (or an error).
-/// Calls are serialized by the mutex; a dead process is respawned on the next.
+/// Calls are serialized by the mutex. A dead OR hung process is killed and
+/// respawned on the next call: each line resets a `pipeline_timeout()` heartbeat,
+/// and exceeding it (or the process ending) drops the server and returns an error.
 pub fn request(window: &Window, req: Value, progress_event: &str) -> Result<Value, String> {
+    let timeout = pipeline_timeout();
     let mut guard = server_slot().lock().map_err(|e| e.to_string())?;
     if guard.is_none() {
         *guard = Some(spawn_server()?);
@@ -195,24 +246,30 @@ pub fn request(window: &Window, req: Value, progress_event: &str) -> Result<Valu
     }
 
     loop {
-        let mut buf = String::new();
-        let read = guard.as_mut().unwrap().stdout.read_line(&mut buf);
-        match read {
-            Ok(0) => {
-                *guard = None; // EOF: process ended
-                return Err("the Python process ended unexpectedly".into());
+        let recv = guard.as_ref().unwrap().rx.recv_timeout(timeout);
+        match recv {
+            Ok(PipelineLine::Progress(value)) => {
+                let _ = window.emit(progress_event, &value);
             }
-            Ok(_) => match classify_line(&buf) {
-                PipelineLine::Progress(value) => {
-                    let _ = window.emit(progress_event, &value);
+            Ok(PipelineLine::Done(value)) => return Ok(value),
+            Ok(PipelineLine::Error(message)) => return Err(message),
+            Ok(PipelineLine::Ignore) => {} // chatter — just resets the heartbeat
+            Err(RecvTimeoutError::Timeout) => {
+                // No output for `timeout`: assume hung. Kill it so the mutex is
+                // freed and the next request gets a fresh process.
+                if let Some(mut s) = guard.take() {
+                    s.kill();
                 }
-                PipelineLine::Done(value) => return Ok(value),
-                PipelineLine::Error(message) => return Err(message),
-                PipelineLine::Ignore => {}
-            },
-            Err(e) => {
-                *guard = None;
-                return Err(format!("error reading from python: {e}"));
+                return Err(format!(
+                    "the Python process timed out after {}s (no output)",
+                    timeout.as_secs()
+                ));
+            }
+            Err(RecvTimeoutError::Disconnected) => {
+                if let Some(mut s) = guard.take() {
+                    s.kill();
+                }
+                return Err("the Python process ended unexpectedly".into());
             }
         }
     }

@@ -24,7 +24,12 @@ def _file2beats():
 def estimate_rhythm(src_wav: str | Path) -> dict:
     try:
         return _rhythm_via_beat_this(src_wav)
-    except Exception:
+    except Exception as exc:
+        # beat_this is the primary tracker; log why it fell through so a genuine
+        # failure (vs an expected "too few beats") is diagnosable on stderr.
+        from . import progress
+
+        progress.log(f"rhythm: beat_this failed ({exc!r}); falling back to librosa")
         return _rhythm_via_librosa(src_wav)
 
 
@@ -212,8 +217,8 @@ def _estimate_meter(onset_env, sr, beat_times: list[float]) -> tuple[int, int]:
     bar length we find the beat phase with the strongest mean accent and how much
     it stands out; 3/4 only wins if its accent contrast clearly beats 4/4.
     """
-    import numpy as np
     import librosa
+    import numpy as np
 
     if len(beat_times) < 6:
         return 4, 0

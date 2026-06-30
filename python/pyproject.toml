@@ -28,4 +28,16 @@ build-backend = "hatchling.build"
 packages = ["paperecho"]
 
 [dependency-groups]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "ruff>=0.6"]
+
+[tool.ruff]
+# Match the runtime target; keep lines roomy for the explanatory comments.
+target-version = "py311"
+line-length = 100
+
+[tool.ruff.lint]
+# pyflakes (F), pycodestyle errors (E), isort (I), pyupgrade (UP), bugbear (B).
+select = ["E", "F", "I", "UP", "B"]
+# E501 (line length) is enforced by the formatter, not the linter, to avoid
+# churning the carefully-wrapped domain comments.
+ignore = ["E501"]

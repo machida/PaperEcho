@@ -7,8 +7,8 @@ higher-level demucs.api module does not exist in this version.
 from __future__ import annotations
 
 import os
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 # htdemucs_6s yields exactly the six parts in the product spec.
 STEMS = ["drums", "bass", "other", "vocals", "guitar", "piano"]
@@ -99,7 +99,7 @@ def separate(
         on_progress(90.0, "Writing stems")
 
     out: dict[str, str] = {}
-    for name, source in zip(model.sources, sources):
+    for name, source in zip(model.sources, sources, strict=False):
         path = stems_dir / f"{name}.wav"
         # soundfile wants (frames, channels); demucs gives (channels, frames).
         data = source.t().cpu().numpy()

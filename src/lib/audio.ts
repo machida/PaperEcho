@@ -1,10 +1,8 @@
 import { convertFileSrc } from "@tauri-apps/api/core";
 
-export interface TrackState {
-  volume: number; // 0..1
-  muted: boolean;
-  soloed: boolean;
-}
+import { anySoloed, effectiveGain, type GainState } from "./mixer-gain";
+
+export type TrackState = GainState;
 
 export interface LoadResult {
   loaded: string[];
@@ -200,11 +198,9 @@ export class StemMixer {
 
   /** Recompute every stem's effective gain (handles solo precedence). */
   private applyGains(): void {
-    const anySolo = [...this.state.values()].some((s) => s.soloed);
+    const anySolo = anySoloed(this.state.values());
     for (const [name, gain] of this.gains) {
-      const s = this.getState(name);
-      const audible = anySolo ? s.soloed : !s.muted;
-      gain.gain.value = audible ? s.volume : 0;
+      gain.gain.value = effectiveGain(this.getState(name), anySolo);
     }
   }
 

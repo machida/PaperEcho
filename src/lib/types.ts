@@ -53,16 +53,17 @@ export interface ExportResult {
   artifacts: ExportArtifact[];
 }
 
-/** Display metadata for each part. `scoreable` parts can produce notation. */
-export const PART_META: Record<PartName, { label: string; color: string }> = {
-  bass: { label: "Bass", color: "#7c5cff" },
-  bass_treble: { label: "Bass (treble 15ma)", color: "#9d86ff" },
-  vocals: { label: "Vocal", color: "#ff5c8a" },
-  guitar: { label: "Guitar", color: "#ffb15c" },
-  piano: { label: "Piano", color: "#41d6a0" },
-  drums: { label: "Drums", color: "#8a93a6" },
-  other: { label: "Other", color: "#5c9dff" },
-  click: { label: "Click", color: "#d2d6df" },
+/** Per-part swatch colour. Display names are localized via i18n (`part.<name>`),
+ * not stored here. */
+export const PART_META: Record<PartName, { color: string }> = {
+  bass: { color: "#7c5cff" },
+  bass_treble: { color: "#9d86ff" },
+  vocals: { color: "#ff5c8a" },
+  guitar: { color: "#ffb15c" },
+  piano: { color: "#41d6a0" },
+  drums: { color: "#8a93a6" },
+  other: { color: "#5c9dff" },
+  click: { color: "#d2d6df" },
 };
 
 export const PART_ORDER: PartName[] = [

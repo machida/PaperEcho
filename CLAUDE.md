@@ -45,10 +45,13 @@ npm install                      # frontend deps
 cd python && uv sync             # python deps (creates python/.venv)
 npm run tauri dev                # run the app (needs a display)
 
-# Tests
+# Tests / checks (CI runs all of these — .github/workflows/ci.yml)
 cd python && ./.venv/bin/python -m pytest tests/ -q
+cd python && ./.venv/bin/ruff check .   # python lint (config in pyproject.toml)
 cd src-tauri && cargo test --lib
-./node_modules/.bin/tsc --noEmit # frontend type-check
+npm run typecheck                # tsc --noEmit
+npm run lint                     # eslint (flat config: eslint.config.js)
+npm test                         # vitest run (src/lib/*.test.ts)
 
 # Run the pipeline directly (no GUI)
 cd python
@@ -61,7 +64,9 @@ Env: `PAPER_ECHO_PYTHON_DIR` (override python dir), `PAPER_ECHO_DEVICE`
 `transcribe._crepe_device` share this, so CREPE + piano default to mps too),
 `PAPER_ECHO_SHIFTS` (Demucs test-time
 augmentation passes, default 2; higher = cleaner separation but ~(1+N)× slower,
-`0` = fastest).
+`0` = fastest), `PAPER_ECHO_PIPELINE_TIMEOUT_SECS` (inter-message heartbeat before
+`python.rs` kills a hung pipeline & respawns it, default 600; must exceed the
+longest silent stretch = the separation call).
 
 ## Gotchas (learned the hard way)
 

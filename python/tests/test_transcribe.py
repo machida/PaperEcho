@@ -43,7 +43,7 @@ def test_repeated_same_pitch_notes_stay_separate(tmp_path):
     # Every note is the same pitch we played (within a semitone of E2).
     assert all(abs(n["pitch"] - 40) <= 1 for n in notes)
     # Notes are ordered and non-overlapping (monophonic line).
-    for a, b in zip(notes, notes[1:]):
+    for a, b in zip(notes, notes[1:], strict=False):
         assert a["end"] <= b["start"] + 1e-6
 
 

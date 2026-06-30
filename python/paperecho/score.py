@@ -124,11 +124,11 @@ def _remove_octave_ghosts(notes: list[dict], eps: float = 0.03) -> list[dict]:
     for h in ordered:
         hp, hs = int(h["pitch"]), h["start"]
         ghost = any(
-            int(l["pitch"]) == hp - 12
-            and l["start"] <= hs + eps
-            and l["end"] - hs >= _GHOST_SUSTAIN_S
-            for l in ordered
-            if l is not h
+            int(lower["pitch"]) == hp - 12
+            and lower["start"] <= hs + eps
+            and lower["end"] - hs >= _GHOST_SUSTAIN_S
+            for lower in ordered
+            if lower is not h
         )
         if not ghost:
             keep.append(h)

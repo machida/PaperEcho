@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
 import { StemMixer, type LoadResult, type TrackState } from "../lib/audio";
+import { formatTime } from "../lib/format";
+import { anySoloed, effectiveGain } from "../lib/mixer-gain";
 import { analyze, mixdown, onProgress, pickSaveMp3, reveal } from "../lib/ipc";
 import { useI18n, type TFunc } from "../lib/i18n";
 import {
@@ -98,12 +100,6 @@ export function Analyze({ filePath, transcribeParts, result, onDone, onExport, o
   );
 }
 
-function formatTime(s: number): string {
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${sec.toString().padStart(2, "0")}`;
-}
-
 function PartsMixer({ result, t }: { result: AnalysisResult; t: TFunc }) {
   const mixer = useRef<StemMixer | null>(null);
   const [ready, setReady] = useState(false);
@@ -125,12 +121,11 @@ function PartsMixer({ result, t }: { result: AnalysisResult; t: TFunc }) {
 
   // Effective per-stem gain = what the mixer is currently playing (solo wins).
   const effectiveGains = (): Record<string, number> => {
-    const anySolo = Object.values(tracks).some((t) => t.soloed);
+    const anySolo = anySoloed(Object.values(tracks));
     const gains: Record<string, number> = {};
     for (const part of result.parts) {
       const s = tracks[part] ?? { volume: 0.9, muted: false, soloed: false };
-      const audible = anySolo ? s.soloed : !s.muted;
-      gains[part] = audible ? s.volume : 0;
+      gains[part] = effectiveGain(s, anySolo);
     }
     return gains;
   };

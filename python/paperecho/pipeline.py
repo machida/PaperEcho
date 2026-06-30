@@ -33,7 +33,7 @@ class ScoreOptions:
     octave_shift: int = 0
 
     @classmethod
-    def from_request(cls, req: dict) -> "ScoreOptions":
+    def from_request(cls, req: dict) -> ScoreOptions:
         return cls(
             tempo_multiplier=req.get("tempo_mult", 1.0),
             beat_offset=req.get("beat_offset", 0.0),
@@ -43,7 +43,7 @@ class ScoreOptions:
         )
 
     @classmethod
-    def from_args(cls, args: argparse.Namespace) -> "ScoreOptions":
+    def from_args(cls, args: argparse.Namespace) -> ScoreOptions:
         return cls(
             tempo_multiplier=args.tempo_mult,
             beat_offset=args.beat_offset,
@@ -387,7 +387,8 @@ def cmd_mixdown(job_dir: str, gains: dict, dest: str) -> None:
     if peak > 1.0:  # avoid clipping from summed stems
         mix = mix / peak
 
-    tmp = tempfile.mktemp(suffix=".wav")
+    fd, tmp = tempfile.mkstemp(suffix=".wav")  # mkstemp: no name-reservation race
+    os.close(fd)  # soundfile writes by path; we only need the unique name
     sf.write(tmp, mix.astype("float32"), sr)
     progress.progress("mixdown", 85, "Encoding mp3")
     try:
@@ -494,6 +495,12 @@ def main(argv: list[str] | None = None) -> int:
     p_pv.add_argument("--octave-shift", type=int, default=0,
                       help="shift the written notes by N octaves (pitch is kept; reading aid)")
 
+    p_mx = sub.add_parser("mixdown")
+    p_mx.add_argument("--job-dir", required=True)
+    p_mx.add_argument("--gains", required=True, type=json.loads,
+                      help='per-part gains as JSON, e.g. \'{"bass":1.0,"vocals":0.5}\'')
+    p_mx.add_argument("--dest", required=True, help="output mp3 path")
+
     sub.add_parser("serve")  # long-lived request loop driven by the Rust backend
 
     args = parser.parse_args(argv)
@@ -508,6 +515,8 @@ def main(argv: list[str] | None = None) -> int:
             )
         elif args.command == "preview":
             cmd_preview(args.job_dir, args.part, ScoreOptions.from_args(args))
+        elif args.command == "mixdown":
+            cmd_mixdown(args.job_dir, args.gains, args.dest)
     except Exception as exc:  # surface a clean error to the backend
         progress.log(traceback.format_exc())
         progress.error(str(exc))

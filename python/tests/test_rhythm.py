@@ -60,7 +60,7 @@ def test_octave_fix_drops_local_double_time():
     beats += [round(tail_start + 0.8 * k, 3) for k in range(1, 6)]  # back to base
 
     out = _fix_octave_jumps(beats)
-    iois = [round(b - a, 3) for a, b in zip(out, out[1:])]
+    iois = [round(b - a, 3) for a, b in zip(out, out[1:], strict=False)]
     # No interval is anywhere near the half-pulse anymore.
     assert min(iois) >= 0.6
     assert max(iois) <= 1.0
@@ -83,7 +83,7 @@ def test_fixed_grid_is_uniform_at_tempo():
     # Jittery 120 BPM beats (0.5 s nominal) -> a perfectly even 0.5 s grid.
     beats = [0.0, 0.52, 0.98, 1.51, 2.03, 2.48, 3.01]
     grid, phase = to_fixed_grid(120.0, beats, downbeat_phase=0, beats_per_bar=4)
-    iois = [round(b - a, 6) for a, b in zip(grid, grid[1:])]
+    iois = [round(b - a, 6) for a, b in zip(grid, grid[1:], strict=False)]
     assert iois and all(abs(i - 0.5) < 1e-6 for i in iois)
     assert phase == 0  # first beat was the downbeat
 

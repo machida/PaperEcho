@@ -22,7 +22,8 @@ export function Home({ onPick }: HomeProps) {
   const toggle = (p: string) =>
     setParts((prev) => {
       const next = new Set(prev);
-      next.has(p) ? next.delete(p) : next.add(p);
+      if (next.has(p)) next.delete(p);
+      else next.add(p);
       return next;
     });
 
@@ -64,6 +65,13 @@ export function Home({ onPick }: HomeProps) {
       <div
         className={`dropzone ${hover ? "is-hover" : ""}`}
         onClick={browse}
+        onKeyDown={(e) => {
+          // Keyboard parity with the click handler (Enter/Space activate a button).
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            void browse();
+          }
+        }}
         role="button"
         tabIndex={0}
       >

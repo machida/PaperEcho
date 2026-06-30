@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { StemMixer } from "../lib/audio";
+import { formatTime } from "../lib/format";
 import { ScorePreview } from "../components/ScorePreview";
 import { Segmented } from "../components/Segmented";
 import {
@@ -174,19 +175,24 @@ export function Export({ result, onBack, onHome }: ExportProps) {
       cancelled = true;
       window.clearTimeout(timer);
     };
+    // `controls` is rebuilt every render from these primitives; listing the
+    // fields (not the object) keeps the effect from re-firing on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [result.job_dir, previewPart, tempoMult, tempoMode, beatOffset, keySharps, octaveShift]);
 
   const togglePart = (p: string) =>
     setParts((prev) => {
       const next = new Set(prev);
-      next.has(p) ? next.delete(p) : next.add(p);
+      if (next.has(p)) next.delete(p);
+      else next.add(p);
       return next;
     });
 
   const toggleFormat = (f: OutputFormat) =>
     setFormats((prev) => {
       const next = new Set(prev);
-      next.has(f) ? next.delete(f) : next.add(f);
+      if (next.has(f)) next.delete(f);
+      else next.add(f);
       return next;
     });
 
@@ -438,12 +444,6 @@ export function Export({ result, onBack, onHome }: ExportProps) {
   );
 }
 
-function fmtTime(s: number): string {
-  const m = Math.floor(s / 60);
-  const sec = Math.floor(s % 60);
-  return `${m}:${sec.toString().padStart(2, "0")}`;
-}
-
 // Single-stem player for the Export preview: lets you hear the source audio of
 // the previewed part while reading its notation, to check the transcription.
 // Reuses the (confirmed-working) StemMixer with a one-entry stem map.
@@ -525,7 +525,7 @@ function StemPlayer({ part, stemPath }: { part: string; stemPath: string }) {
         }}
       />
       <span className="time">
-        {fmtTime(pos)} / {fmtTime(dur)}
+        {formatTime(pos)} / {formatTime(dur)}
       </span>
     </span>
   );
