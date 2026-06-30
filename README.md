@@ -89,6 +89,18 @@ cd python && uv sync && cd ..
 > `ffmpeg-static` パッケージ経由で取得し、`scripts/stage-ffmpeg.mjs` が配置します。
 > 必要に応じて `npm run stage:ffmpeg` で再実行できます。
 
+### テスト / チェック
+
+CI（`.github/workflows/ci.yml`）と同じものをローカルで実行できます。
+
+```sh
+npm run typecheck                       # TypeScript 型チェック
+npm run lint                            # ESLint
+npm test                                # Vitest（フロントの単体テスト）
+cd python && ./.venv/bin/python -m pytest tests/ -q && ./.venv/bin/ruff check .
+cd src-tauri && cargo test --lib
+```
+
 ## 実行
 
 ```sh
@@ -111,6 +123,9 @@ npm run tauri dev
 - `PAPER_ECHO_SHIFTS` — Demucs のテスト時オーグメンテーション回数（既定 `2`）。
   大きいほど分離がきれい（ギター/ピアノのアタックのにじみが減る）ですが、約 (1+N)
   倍遅くなります。最速にするには `0`。
+- `PAPER_ECHO_PIPELINE_TIMEOUT_SECS` — バックエンドが Python パイプラインの無応答を
+  ハングと見なして再起動するまでの待ち時間（既定 `600`）。分離処理は無出力で数分
+  かかるため、この値はそれより長く設定します。
 - `PAPER_ECHO_RUNTIME_URL` / `PAPER_ECHO_RUNTIME_SHA256` — 初回起動時のランタイム
   ダウンロード URL / 期待されるチェックサムを上書きします（パッケージ済みビルド
   のみ。下記参照）。

@@ -30,7 +30,10 @@ llvmlite, …）は約 1 GB あります。同梱すると DMG は 384 MB、`.ap
    ステージし（「ランタイム」参照）、**スリム化** したうえで
    `dist-runtime/paperecho-runtime-<ver>-arm64.tar.zst` としてパックし、その
    sha256 をサイドカーと同梱リソース `src-tauri/resources-arm64/runtime.sha256` の
-   両方に書き出します。
+   両方に書き出します。**`runtime.sha256` は git 追跡対象**です（65 バイト。アプリが
+   検証に使う値なので、クローンや CI でも正しいビルドができるよう repo に含めます。
+   `resources-arm64/` の重い成果物 `bin/ffmpeg`・`runtime/`・`model-cache/` は除外）。
+   ターボールを再パックしたら、更新された `runtime.sha256` をコミットしてください。
 2. そのターボールを `v<ver>` タグの **GitHub Release** にアップロードします。
 3. `.app` には `resources-arm64/bin/ffmpeg` + `resources-arm64/runtime.sha256`
    だけを同梱します。
@@ -46,11 +49,11 @@ llvmlite, …）は約 1 GB あります。同梱すると DMG は 384 MB、`.ap
      専用のランタイムを取得し、古いものは単に再取得されます。
 
 **URL は設定可能**（`runtime.rs`）: 既定は
-`<RELEASE_BASE>/v<ver>/paperecho-runtime-<ver>-<arch>.tar.zst`。URL 全体は
-`PAPER_ECHO_RUNTIME_URL`、期待ハッシュは `PAPER_ECHO_RUNTIME_SHA256` で上書き
-できます——本物の Release が無い段階でのテストや、別の場所でターボールをホストする
-のに便利です。**公開前に `runtime.rs` の `RELEASE_BASE` を本物のリポジトリに更新**
-してください（現在はプレースホルダ）。
+`<RELEASE_BASE>/v<ver>/paperecho-runtime-<ver>-<arch>.tar.zst`。`RELEASE_BASE` は
+本物のリポジトリ（`https://github.com/machida/PaperEcho/releases/download`）に
+設定済みです。URL 全体は `PAPER_ECHO_RUNTIME_URL`、期待ハッシュは
+`PAPER_ECHO_RUNTIME_SHA256` で上書きできます——本物の Release が無い段階での
+テストや、別の場所でターボールをホストするのに便利です。
 
 ---
 
@@ -125,6 +128,13 @@ codesign --force --deep -s - \
 ```
 
 パックには `zstd`（`brew install zstd`）が必要です。
+
+**アプリだけ更新する場合（ランタイム不変）:** フロント/Rust の修正だけでランタイム
+依存が変わっていないなら、ステップ 1 は不要です。`runtime.sha256` は同じ値のまま
+なので、既存の Release ターボールとの整合は保たれます。アプリ（DMG）を再ビルドして
+`gh release upload v<ver> "…/Paper Echo_<ver>_aarch64.dmg" --clobber` で差し替える
+だけで配布更新できます。チェックサムは `runtime.sha256` ＝ Release のターボールで
+一致している必要があります。
 
 **受け取る人の初回起動の流れ:** DMG 内のアプリを右クリック →「開く」（未署名 →
 Gatekeeper が一度警告）。するとアプリがランタイム（約 430 MB——スリム化された
