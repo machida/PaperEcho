@@ -135,7 +135,8 @@ Rust⇄Python の 1 行 JSON 契約、`ScoreOptions` への整形パラメータ
   `.github/workflows/ci.yml` で web(typecheck/lint/test)・python(ruff+pytest)・rust
   (cargo test) を実行。ruff（E/F/I/UP/B）も `pyproject.toml` に追加し `ruff check`
   グリーン（`l`→`lower`、`zip(..., strict=False)`、`from_request`/`from_args` の型
-  注釈の引用符除去など軽微な是正）。
+  注釈の引用符除去など軽微な是正）。**GitHub Actions で 3 ジョブ全 green を確認済み**
+  （初回失敗の原因は `resources-arm64/runtime.sha256` 未コミット → tracked 化で解消）。
 
 ### Low
 - [x] **L1** `PART_META` を `{ color }` のみに縮小し、古いコメントを修正。
