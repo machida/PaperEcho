@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from "react";
 
 import { StemMixer } from "../lib/audio";
 import { formatTime } from "../lib/format";
-import { ScorePreview } from "../components/ScorePreview";
 import { Segmented } from "../components/Segmented";
 import {
   exportParts,
@@ -23,6 +22,12 @@ import {
   type PartName,
   type ProgressPayload,
 } from "../lib/types";
+
+// OpenSheetMusicDisplay is large (~the bulk of the JS bundle) and only needed on
+// the Export screen's live preview, so load it as a separate chunk on demand.
+const ScorePreview = lazy(() =>
+  import("../components/ScorePreview").then((m) => ({ default: m.ScorePreview })),
+);
 
 interface ExportProps {
   result: AnalysisResult;
@@ -374,7 +379,11 @@ export function Export({ result, onBack, onHome }: ExportProps) {
               />
             )}
           </div>
-          <ScorePreview musicxml={previewXml} loading={previewLoading} />
+          <Suspense
+            fallback={<div className="score-preview-loading">{t("score.rendering")}</div>}
+          >
+            <ScorePreview musicxml={previewXml} loading={previewLoading} />
+          </Suspense>
         </div>
       )}
 
